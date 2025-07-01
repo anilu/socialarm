@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Login</title>
+  <style>
+    body {
+      background: #f5f5f5;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding-top: 100px;
+    }
+    .container {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      padding: 30px;
+      max-width: 400px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 30px;
+    }
+    input {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      font-size: 16px;
+    }
+    button {
+      background: #2196F3;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-top: 20px;
+      width: 100%;
+    }
+    button:hover {
+      background: #0b7dda;
+    }
+    .message {
+      margin-top: 20px;
+      color: #d32f2f;
+      font-weight: bold;
+    }
+    .register-link {
+      margin-top: 20px;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Login</h1>
+    <input type="text" id="username" placeholder="Username" autocomplete="off">
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+    <div id="message" class="message"></div>
+    <a href="register.html" class="register-link">Don't have an account? Register</a>
+  </div>
+
+  <script>
+    function login() {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const message = document.getElementById('message');
+      
+      if (!username || !password) {
+        message.textContent = "Please fill all fields";
+        return;
+      }
+      
+      const users = JSON.parse(localStorage.getItem('users')) || {};
+      
+      if (!users[username] || users[username].password !== password) {
+        message.textContent = "Invalid username or password";
+        return;
+      }
+      
+      // Set current user
+      localStorage.setItem('currentUser', JSON.stringify({
+        username: username,
+        score: users[username].score
+      }));
+      
+      message.textContent = "Login successful!";
+      setTimeout(() => window.location.href = 'index.html', 1500);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Alarm Clock with Random Math Challenge</title>
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      background-color: #C3F0FF;
+      font-family: 'Roboto', Arial, sans-serif;
+      text-align: center;
+      padding-top: 40px;
+      position: relative;
+    }
+    h1 {
+      font-family: 'Roboto', sans-serif;
+      font-size: 60px;
+      margin-bottom: 40px;
+      letter-spacing: 2px;
+    }
+    #alarm-datetime {
+      width: 60%;
+      font-size: 28px;
+      padding: 15px;
+      margin-bottom: 10px;
+      border-radius: 10px;
+      border: 2px solid #888;
+    }
+    button#set-button {
+      font-size: 18px;
+      padding: 10px 25px;
+      border: none;
+      border-radius: 8px;
+      background-color: #fff;
+      cursor: pointer;
+      margin-top: 5px;
+    }
+    #status {
+      font-size: 20px;
+      margin-top: 20px;
+    }
+    .quiz {
+      display: none;
+      margin-top: 30px;
+    }
+    .quiz h2 {
+      font-size: 28px;
+      margin-bottom: 20px;
+    }
+    .quiz button {
+      margin: 10px;
+      padding: 20px 30px;
+      font-size: 24px;
+      cursor: pointer;
+      border: none;
+      border-radius: 10px;
+      background-color: #fff;
+      transition: transform 0.2s ease;
+    }
+    .quiz button:hover {
+      transform: scale(1.1);
+      background-color: #eee;
+    }
+    #score-display {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      font-size: 24px;
+      font-weight: bold;
+      background: rgba(255, 255, 255, 0.7);
+      padding: 10px 15px;
+      border-radius: 10px;
+    }
+    .auth-links {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      font-size: 18px;
+    }
+    .auth-links a, .auth-links span, .auth-links button {
+      color: #003366;
+      background: none;
+      border: none;
+      font: inherit;
+      cursor: pointer;
+      text-decoration: none;
+      margin-right: 10px;
+    }
+    .notification {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      padding: 15px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      z-index: 1000;
+      display: none;
+      text-align: center;
+    }
+    .notification-buttons {
+      margin-top: 10px;
+    }
+    .notification-buttons button {
+      margin: 0 5px;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-links" id="auth-links">
+    <a href="index.html">Home</a> | <a href="friends.html">Friends</a> |
+  </div>
+  <div class="notification" id="friend-notification"></div>
+  <div id="score-display">Score: 0</div>
+  <h1>Alarm Clock</h1>
+  <p>Current Time: <span id="current-time">--:--:--</span></p>
+  <input type="datetime-local" id="alarm-datetime" />
+  <br />
+  <button id="set-button" onclick="setAlarm()">Set Alarm</button>
+  <p id="status"></p>
+  <audio id="alarm-audio" src="alarm-clock-90867.mp3" preload="auto" loop></audio>
+  <div id="quiz" class="quiz">
+    <h2 id="question-text">What is ...?</h2>
+    <div id="choices"></div>
+  </div>
+  <script>
+    // User and logout logic
+    function getCurrentUser() {
+      return JSON.parse(localStorage.getItem('currentUser'));
+    }
+    function getName() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('name') ? decodeURIComponent(params.get('name')) : '';
+    }
+
+    function logout() {
+      localStorage.removeItem('currentUser');
+      window.location.href = "index.html";
+    }
+
+    // Alarm logic
+    const userName = getName();
+    const currentTimeDisplay = document.getElementById("current-time");
+    const alarmAudio = document.getElementById("alarm-audio");
+    const quiz = document.getElementById("quiz");
+    const questionText = document.getElementById("question-text");
+    const choicesDiv = document.getElementById("choices");
+    const scoreDisplay = document.getElementById("score-display");
+
+    let alarmTime = null;
+    let alarmSet = false;
+    let alarmTriggered = false;
+    let correctAnswer = null;
+    let score = 0;
+    let alarmStartTime = 0;
+
+    // Load score from localStorage if available
+    function loadScore() {
+      const currentUser = getCurrentUser();
+      if (currentUser) {
+        score = currentUser.score || 0;
+        scoreDisplay.textContent = `Score: ${score}`;
+      }
+    }
+
+    // Save score to localStorage
+    function saveScore() {
+      const currentUser = getCurrentUser();
+      if (currentUser) {
+        currentUser.score = score;
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        // Update global users storage
+        const users = JSON.parse(localStorage.getItem('users')) || {};
+        if (users[currentUser.username]) {
+          users[currentUser.username].score = score;
+          localStorage.setItem('users', JSON.stringify(users));
+        }
+      }
+    }
+
+    function updateTime() {
+      const now = new Date();
+      currentTimeDisplay.textContent = now.toLocaleTimeString('en-GB');
+      if (alarmSet && !alarmTriggered && alarmTime && now >= alarmTime) {
+        triggerAlarm();
+      }
+      setTimeout(updateTime, 1000);
+    }
+
+    function setAlarm() {
+      const input = document.getElementById("alarm-datetime").value;
+      if (!input) {
+        alert("Please select date and time for the alarm.");
+        return;
+      }
+      alarmTime = new Date(input);
+      if (isNaN(alarmTime.getTime())) {
+        alert("Invalid date/time format.");
+        return;
+      }
+      if (alarmTime <= new Date()) {
+        alert("Please select a future date and time.");
+        return;
+      }
+      alarmSet = true;
+      alarmTriggered = false;
+      document.getElementById("status").textContent =
+        "Alarm set for " + alarmTime.toLocaleString();
+      quiz.style.display = "none";
+    }
+
+    function triggerAlarm() {
+      alarmAudio.play();
+      alarmTriggered = true;
+      alarmStartTime = Date.now();
+      const currentUser = getCurrentUser();
+      document.getElementById("status").textContent = "⏰ Wake up, " + ((currentUser && currentUser.username) || userName || "there") + "!";
+      generateMathQuestion();
+      quiz.style.display = "block";
+    }
+
+    function generateMathQuestion() {
+      const num1 = Math.floor(Math.random() * 10) + 1;
+      const num2 = Math.floor(Math.random() * 10) + 1;
+      correctAnswer = num1 * num2;
+      questionText.textContent = `What is ${num1} × ${num2}?`;
+      const choices = new Set();
+      choices.add(correctAnswer);
+      while (choices.size < 4) {
+        choices.add(Math.floor(Math.random() * 100));
+      }
+      const shuffled = Array.from(choices).sort(() => Math.random() - 0.5);
+      choicesDiv.innerHTML = '';
+      shuffled.forEach(value => {
+        const btn = document.createElement('button');
+        btn.textContent = value;
+        btn.onclick = () => checkAnswer(value);
+        choicesDiv.appendChild(btn);
+      });
+    }
+
+    function calculatePoints(timeTaken) {
+      const seconds = Math.floor(timeTaken / 1000);
+      if (seconds <= 1) return 5;
+      if (seconds <= 2) return 4;
+      if (seconds <= 3) return 3;
+      if (seconds <= 4) return 2;
+      return 1;
+    }
+
+    function updateScore(points) {
+      score += points;
+      scoreDisplay.textContent = `Score: ${score}`;
+      saveScore();
+    }
+
+    function checkAnswer(answer) {
+      const timeTaken = Date.now() - alarmStartTime;
+      if (answer === correctAnswer) {
+        const points = calculatePoints(timeTaken);
+        updateScore(points);
+        alarmAudio.pause();
+        alarmAudio.currentTime = 0;
+        document.getElementById("status").textContent = `✅ Correct! +${points} points`;
+        quiz.style.display = "none";
+        alarmSet = false;
+      } else {
+        updateScore(-1);
+        document.getElementById("status").textContent = "❌ Wrong answer! -1 point";
+      }
+    }
+
+    // Friend request notification logic
+    function checkFriendRequests() {
+      const currentUser = getCurrentUser();
+      if (!currentUser) return;
+
+      const friendRequests = JSON.parse(localStorage.getItem('friendRequests')) || {};
+      const requests = friendRequests[currentUser.username] || [];
+      if (requests.length > 0) {
+        const notification = document.getElementById('friend-notification');
+        notification.innerHTML = `
+          <p>${requests[0]} wants to be your friend!</p>
+          <div class="notification-buttons">
+            <button onclick="acceptFriendRequest('${requests[0]}')">Accept</button>
+            <button onclick="declineFriendRequest('${requests[0]}')">Decline</button>
+          </div>
+        `;
+        notification.style.display = 'block';
+      }
+    }
+
+    function acceptFriendRequest(friendUsername) {
+      const currentUser = getCurrentUser();
+      if (!currentUser) return;
+
+      // Add to friends list
+      if (!currentUser.friends) currentUser.friends = [];
+      if (!currentUser.friends.includes(friendUsername)) {
+        currentUser.friends.push(friendUsername);
+      }
+
+      // Add current user to friend's friends list
+      const users = JSON.parse(localStorage.getItem('users')) || {};
+      if (users[friendUsername]) {
+        if (!users[friendUsername].friends) users[friendUsername].friends = [];
+        if (!users[friendUsername].friends.includes(currentUser.username)) {
+          users[friendUsername].friends.push(currentUser.username);
+        }
+      }
+
+      // Save users
+      users[currentUser.username] = currentUser;
+      localStorage.setItem('users', JSON.stringify(users));
+      localStorage.setItem('currentUser', JSON.stringify(currentUser));
+
+      // Remove request
+      removeFriendRequest(friendUsername);
+
+      // Hide notification
+      document.getElementById('friend-notification').style.display = 'none';
+    }
+
+    function declineFriendRequest(friendUsername) {
+      removeFriendRequest(friendUsername);
+      document.getElementById('friend-notification').style.display = 'none';
+    }
+
+    function removeFriendRequest(friendUsername) {
+      const currentUser = getCurrentUser();
+      if (!currentUser) return;
+
+      const friendRequests = JSON.parse(localStorage.getItem('friendRequests')) || {};
+      if (friendRequests[currentUser.username]) {
+        friendRequests[currentUser.username] = friendRequests[currentUser.username].filter(
+          user => user !== friendUsername
+        );
+        localStorage.setItem('friendRequests', JSON.stringify(friendRequests));
+      }
+    }
+
+    loadScore();
+    updateTime();
+    setInterval(checkFriendRequests, 5000);
+  </script>
+</body>
+</html>

@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Friends</title>
+  <style>
+    body {
+      background: #f5f5f5;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding-top: 100px;
+      margin: 0;
+    }
+    .auth-links {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      font-size: 18px;
+    }
+    .auth-links a, .auth-links button {
+      margin: 0 10px;
+      text-decoration: none;
+      color: #0066cc;
+      background: none;
+      border: none;
+      font: inherit;
+      cursor: pointer;
+    }
+    .container {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      padding: 30px;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 30px;
+    }
+    .search-container {
+      display: flex;
+      margin-bottom: 20px;
+      justify-content: center;
+    }
+    input[type="text"] {
+      flex: 1;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 5px 0 0 5px;
+      font-size: 16px;
+      min-width: 0;
+    }
+    button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 0 5px 5px 0;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    .message {
+      margin: 10px 0;
+      color: #d32f2f;
+      font-weight: bold;
+      min-height: 24px;
+    }
+    .friends-list, .pending-list {
+      margin-top: 30px;
+      text-align: left;
+    }
+    .friend-item, .pending-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+    }
+    .friend-name, .pending-name {
+      font-weight: bold;
+    }
+    .friend-score {
+      color: #0066cc;
+    }
+    .pending-actions button {
+      background: #2196F3;
+      color: white;
+      border: none;
+      padding: 5px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-left: 5px;
+      font-size: 14px;
+    }
+    .pending-actions button.decline {
+      background: #d32f2f;
+    }
+    @media (max-width: 600px) {
+      .container { padding: 10px; }
+      .search-container { flex-direction: column; }
+      input[type="text"], button { width: 100%; border-radius: 5px; margin: 5px 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-links" id="auth-links"></div>
+  <div class="container">
+    <h1>Friends</h1>
+    <div class="search-container">
+      <input type="text" id="search-username" placeholder="Enter username" autocomplete="off">
+      <button onclick="addFriend()">+ Add</button>
+    </div>
+    <div id="message" class="message"></div>
+    <div class="pending-list">
+      <h2>Pending Friend Requests</h2>
+      <div id="pending-list"></div>
+    </div>
+    <div class="friends-list">
+      <h2>Your Friends</h2>
+      <div id="friends-list"></div>
+    </div>
+  </div>
+  <script>
+    // --- User and Navigation ---
+    function getCurrentUser() {
+      try {
+        return JSON.parse(localStorage.getItem('currentUser'));
+      } catch(e) { return null; }
+    }
+    function getUsers() {
+      try {
+        return JSON.parse(localStorage.getItem('users')) || {};
+      } catch(e) { return {}; }
+    }
+    function saveUsers(users) {
+      localStorage.setItem('users', JSON.stringify(users));
+    }
+    function saveCurrentUser(user) {
+      localStorage.setItem('currentUser', JSON.stringify(user));
+    }
+    function getFriendRequests() {
+      try {
+        return JSON.parse(localStorage.getItem('friendRequests')) || {};
+      } catch(e) { return {}; }
+    }
+    function saveFriendRequests(requests) {
+      localStorage.setItem('friendRequests', JSON.stringify(requests));
+    }
+    function setupAuthLinks() {
+      const authLinks = document.getElementById('auth-links');
+      const currentUser = getCurrentUser();
+      if (currentUser) {
+        authLinks.innerHTML = `
+          <a href="index.html">Home</a> | 
+          <a href="friends.html">Friends</a> | 
+          <button onclick="logout()">Logout, ${currentUser.username}</button>
+        `;
+      } else {
+        authLinks.innerHTML = `
+          <a href="index.html">Home</a> | 
+          <a href="friends.html">Friends</a> | 
+          <a href="register.html">Register</a> | 
+          <a href="login.html">Login</a>
+        `;
+      }
+    }
+    function logout() {
+      localStorage.removeItem('currentUser');
+      window.location.href = "index.html";
+    }
+
+    // --- Add Friend Logic ---
+    function addFriend() {
+      const messageEl = document.getElementById('message');
+      messageEl.textContent = '';
+      const searchInput = document.getElementById('search-username');
+      const friendUsername = searchInput.value.trim();
+      const currentUser = getCurrentUser();
+      if (!currentUser) {
+        messageEl.textContent = "Please login to add friends!";
+        return;
+      }
+      if (!friendUsername) {
+        messageEl.textContent = "Please enter a username!";
+        return;
+      }
+      const users = getUsers();
+      if (!users[friendUsername]) {
+        messageEl.textContent = "User not found!";
+        return;
+      }
+      if (friendUsername === currentUser.username) {
+        messageEl.textContent = "You can't add yourself!";
+        return;
+      }
+      if (currentUser.friends && currentUser.friends.includes(friendUsername)) {
+        messageEl.textContent = "Already friends!";
+        return;
+      }
+      // Check if already sent request
+      const friendRequests = getFriendRequests();
+      let sent = false;
+      if (friendRequests[friendUsername] && friendRequests[friendUsername].includes(currentUser.username)) {
+        sent = true;
+      }
+      if (sent) {
+        messageEl.textContent = "Friend request already sent!";
+        return;
+      }
+      // Add friend request
+      if (!friendRequests[friendUsername]) friendRequests[friendUsername] = [];
+      friendRequests[friendUsername].push(currentUser.username);
+      saveFriendRequests(friendRequests);
+      messageEl.style.color = "#388e3c";
+      messageEl.textContent = `Friend request sent to ${friendUsername}!`;
+      searchInput.value = '';
+      loadPendingList();
+    }
+
+    // --- Pending Requests ---
+    function loadPendingList() {
+      const pendingList = document.getElementById('pending-list');
+      pendingList.innerHTML = '';
+      const currentUser = getCurrentUser();
+      if (!currentUser) return;
+      const friendRequests = getFriendRequests();
+      const requests = friendRequests[currentUser.username] || [];
+      if (requests.length === 0) {
+        pendingList.innerHTML = '<p>No pending requests.</p>';
+        return;
+      }
+      requests.forEach(username => {
+        const div = document.createElement('div');
+        div.className = 'pending-item';
+        div.innerHTML = `
+          <span class="pending-name">${username}</span>
+          <span class="pending-actions">
+            <button onclick="acceptFriendRequest('${username}')">Accept</button>
+            <button class="decline" onclick="declineFriendRequest('${username}')">Decline</button>
+          </span>
+        `;
+        pendingList.appendChild(div);
+      });
+    }
+    function acceptFriendRequest(friendUsername) {
+      const currentUser = getCurrentUser();
+      if (!currentUser) return;
+      // Add to friends list
+      if (!currentUser.friends) currentUser.friends = [];
+      if (!currentUser.friends.includes(friendUsername)) {
+        currentUser.friends.push(friendUsername);
+      }
+      // Add current user to friend's friends list
+      const users = getUsers();
+      if (users[friendUsername]) {
+        if (!users[friendUsername].friends) users[friendUsername].friends = [];
+        if (!users[friendUsername].friends.includes(currentUser.username)) {
+          users[friendUsername].friends.push(currentUser.username);
+        }
+      }
+      // Save users
+      users[currentUser.username] = currentUser;
+      saveUsers(users);
+      saveCurrentUser(currentUser);
+      // Remove request
+      removeFriendRequest(friendUsername);
+      loadFriendsList();
+      loadPendingList();
+      showMessage(`You and ${friendUsername} are now friends!`, true);
+    }
+    function declineFriendRequest(friendUsername) {
+      removeFriendRequest(friendUsername);
+      loadPendingList();
+      showMessage(`Declined friend request from ${friendUsername}.`, false);
+    }
+    function removeFriendRequest(friendUsername) {
+      const currentUser = getCurrentUser();
+      if (!currentUser) return;
+      const friendRequests = getFriendRequests();
+      if (friendRequests[currentUser.username]) {
+        friendRequests[currentUser.username] = friendRequests[currentUser.username].filter(
+          user => user !== friendUsername
+        );
+        saveFriendRequests(friendRequests);
+      }
+    }
+
+    // --- Friends List ---
+    function loadFriendsList() {
+      const friendsList = document.getElementById('friends-list');
+      friendsList.innerHTML = '';
+      const currentUser = getCurrentUser();
+      if (!currentUser || !currentUser.friends || currentUser.friends.length === 0) {
+        friendsList.innerHTML = '<p>No friends yet. Search for users to add!</p>';
+        return;
+      }
+      const users = getUsers();
+      currentUser.friends.forEach(friendUsername => {
+        if (users[friendUsername]) {
+          const friendItem = document.createElement('div');
+          friendItem.className = 'friend-item';
+          friendItem.innerHTML = `
+            <span class="friend-name">${friendUsername}</span>
+            <span class="friend-score">${users[friendUsername].score || 0} pts</span>
+          `;
+          friendsList.appendChild(friendItem);
+        }
+      });
+    }
+
+    // --- Message Helper ---
+    function showMessage(msg, success) {
+      const messageEl = document.getElementById('message');
+      messageEl.textContent = msg;
+      messageEl.style.color = success ? "#388e3c" : "#d32f2f";
+      setTimeout(() => { messageEl.textContent = ""; }, 4000);
+    }
+
+    // --- Initialization ---
+    setupAuthLinks();
+    loadFriendsList();
+    loadPendingList();
+  </script>
+</body>
+</html>

@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Alarm Challenge</title>
+  <style>
+    body {
+      background: #eee;
+      text-align: center;
+      padding-top: 100px;
+      font-family: Arial, sans-serif;
+      position: relative;
+    }
+    .auth-links {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      font-size: 18px;
+    }
+    .auth-links a, .auth-links button {
+      margin: 0 10px;
+      text-decoration: none;
+      color: #0066cc;
+      background: none;
+      border: none;
+      font: inherit;
+      cursor: pointer;
+    }
+    h1 {
+      font-size: 48px;
+      margin-bottom: 40px;
+    }
+    .choice-btn {
+      font-size: 32px;
+      padding: 30px 60px;
+      margin: 30px;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .girl {
+      background: #F0C3FF;
+      color: #a600a6;
+    }
+    .girl:hover {
+      background: #e0a0e0;
+    }
+    .boy {
+      background: #b3d4fc;
+      color: #003366;
+    }
+    .boy:hover {
+      background: #7ab8f5;
+    }
+    input[type="text"] {
+      font-size: 24px;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #aaa;
+      width: 300px;
+      margin-bottom: 30px;
+      margin-top: 20px;
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    label {
+      font-size: 24px;
+    }
+    #leaderboard {
+      max-width: 500px;
+      margin: 40px auto;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      padding: 20px;
+      background: white;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    #leaderboard h2 {
+      margin-top: 0;
+    }
+    .leaderboard-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+    }
+    .leaderboard-item:last-child {
+      border-bottom: none;
+    }
+    .leaderboard-name {
+      font-weight: bold;
+    }
+    .leaderboard-score {
+      color: #0066cc;
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-links" id="auth-links">
+    <a href="friends.html">Friends</a>
+  </div>
+  
+  <h1 id="welcome-title">Who are you?</h1>
+  <label for="username" id="name-label">Enter your name:</label>
+  <input type="text" id="username" placeholder="Your name..." maxlength="20" autocomplete="off" />
+  <br>
+  <button class="choice-btn girl" onclick="goToAlarm('girl')">Girl</button>
+  <button class="choice-btn boy" onclick="goToAlarm('boy')">Boy</button>
+  
+  <div id="leaderboard" style="display: none;">
+    <h2>Friends Leaderboard</h2>
+    <div id="leaderboard-list"></div>
+  </div>
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      function getCurrentUser() {
+        try {
+          return JSON.parse(localStorage.getItem('currentUser'));
+        } catch(e) {
+          return null;
+        }
+      }
+
+      function updateAuthUI() {
+        const authLinks = document.getElementById('auth-links');
+        const currentUser = getCurrentUser();
+        const leaderboard = document.getElementById('leaderboard');
+        
+        if (currentUser) {
+          authLinks.innerHTML = `<a href="friends.html">Friends</a> | <button onclick="logout()">Logout</button>`;
+          document.getElementById('welcome-title').textContent = `Welcome, ${currentUser.username}!`;
+          document.getElementById('name-label').style.display = 'none';
+          document.getElementById('username').style.display = 'none';
+          leaderboard.style.display = 'block';
+          loadLeaderboard();
+        } else {
+          authLinks.innerHTML = `<a href="friends.html">Friends</a> | <a href="register.html">Register</a> | <a href="login.html">Login</a>`;
+          document.getElementById('welcome-title').textContent = `Who are you?`;
+          document.getElementById('name-label').style.display = '';
+          document.getElementById('username').style.display = '';
+          leaderboard.style.display = 'none';
+        }
+      }
+
+      function logout() {
+        localStorage.removeItem('currentUser');
+        updateAuthUI();
+      }
+
+      window.goToAlarm = function(profile) {
+        const currentUser = getCurrentUser();
+        let name;
+        if (currentUser) {
+          name = encodeURIComponent(currentUser.username);
+        } else {
+          name = encodeURIComponent(document.getElementById('username').value.trim());
+          if (!name) {
+            alert("Please enter your name!");
+            return;
+          }
+        }
+        if (profile === 'girl') {
+          window.location.href = `alarm_girl.html?name=${name}`;
+        } else {
+          window.location.href = `alarm_boy.html?name=${name}`;
+        }
+      };
+
+      function loadLeaderboard() {
+        const currentUser = getCurrentUser();
+        if (!currentUser) return;
+        
+        const users = JSON.parse(localStorage.getItem('users')) || {};
+        const leaderboardList = document.getElementById('leaderboard-list');
+        leaderboardList.innerHTML = '';
+        
+        // Add current user
+        const friends = currentUser.friends || [];
+        const allUsers = [currentUser.username, ...friends];
+        
+        // Create leaderboard data
+        const leaderboardData = [];
+        for (const username of allUsers) {
+          if (users[username]) {
+            leaderboardData.push({
+              username,
+              score: users[username].score || 0
+            });
+          }
+        }
+        
+        // Sort by score (descending)
+        leaderboardData.sort((a, b) => b.score - a.score);
+        
+        // Display leaderboard
+        for (const user of leaderboardData) {
+          const item = document.createElement('div');
+          item.className = 'leaderboard-item';
+          item.innerHTML = `
+            <span class="leaderboard-name">${user.username}</span>
+            <span class="leaderboard-score">${user.score} pts</span>
+          `;
+          leaderboardList.appendChild(item);
+        }
+      }
+
+      updateAuthUI();
+    });
+  </script>
+</body>
+</html>
